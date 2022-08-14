@@ -1,17 +1,19 @@
 ''' Praticle and Fast Collision detection for autonomous driving.
-Rectangle and circle.
+objects: Rectangle and circle.
+According to the implemetation difficulty. 3 method are used.
+methods:  seperating axis therom; double circle method; particle model;
+
 '''
 import numpy as np
 import os, math, yaml, time
 from math import cos, sin, sqrt
 from geometry import Rectangle, Circle
 import matplotlib.pyplot as plt
-import casadi
-from configs.vehicleparams import VehicleParams
+from vehicleparams import VehicleParams
 
-path_cfg = os.path.join("configs", "control.yaml")
-f_cfg = open(path_cfg)
-car_cfg = yaml.load(f_cfg)
+# path_cfg = os.path.join("configs", "control.yaml")
+# f_cfg = open(path_cfg)
+# car_cfg = yaml.load(f_cfg)
 
 
 def collision_rect_and_rect(rect1: Rectangle, rect2: Rectangle):
@@ -54,7 +56,9 @@ def collision_rect_and_rect(rect1: Rectangle, rect2: Rectangle):
 
 
 def collision_circle_and_rect(c:Circle, r:Rectangle):
-    # find the nearest vertices to circle. and
+    ''' dectect 2 + 1 axis. https://www.sevenson.com.au/programming/sat/
+    '''
+    # find the nearest vertices to circle
     if not hasattr(r, 'vertices'):
         vertices = r.calc_vertices()
     d_min = np.Inf
@@ -210,11 +214,9 @@ def is_collision_simple(obj1, obj2):
     pass
 
 
-def get_disc_positions(x, y, theta, use_casadi=False):
+def get_disc_positions(x, y, theta):
     if type(x) is np.ndarray:
         cos, sin = np.cos, np.sin
-    elif type(x) is casadi.casadi.SX or type(x) is casadi.casadi.MX:
-        cos, sin = casadi.cos, casadi.sin
     else:
         cos, sin = math.cos, math.sin
 
@@ -255,46 +257,83 @@ def plotobj(*objs):
 
 def unitest():
     '''
-    test method: 3 angles * 3 center * near crash and crash cases
+    test method: 4 angles * 4 center * near crash and crash cases
     '''
 
 
-    angles = [30, 110, 200]
+    angles = [30, 110, 200, -30]
     angles = [np.deg2rad(angle) for angle in angles]
 
-    centers = np.array([
-        [3,7],
-        [-5, 1],
-        [1,5]])
+    center_theta = [55, 150, 210, -45]
+    centers = np.ones([4, 2])
+    for i in range(centers.shape[0]):
+        centers[i, 0] = cos(center_theta[i])
+        centers[i, 1] = sin(center_theta[i])
 
-    distance = np.array([
-        [3.6,3.6,3.6],
-        [3.6,3.6,3.6],
-        [4.43,4.43,4.43]
+
+    dis_r2r = np.array([
+        [
+            [4,     3.8,      0,      0],
+            [0,     0,      0,      0],
+            [0,     0,      0,      0],
+            [0,     0,      0,      0],
+        ],
+        [
+            [4.1,     3.9,      0,      0],
+            [0,     0,      0,      0],
+            [0,     0,      0,      0],
+            [0,     0,      0,      0],
+        ]
     ])
     rs = np.array([
         [1.3, 1.3, 1.3],
         [2.2,2.2,2.2],
         [2.18,2.18,2.18]
     ])
-    for i in range(3):
-        angle = angles[i]
-        for j in range(3):
-            center = centers[j]
-            d = distance[i, j]
-            r = rs[i,j]
-            r1 = Rectangle(center[0], center[1], angle)
-            r2 = Rectangle(center[0]+d, center[1], angle*2)
-            r3 = Rectangle(center[0]+d+0.1, center[1], angle*2)
-            # c1 = Circle(center[0]+d, center[1], r+0.1)
-            # c2 = Circle(center[0]+d, center[1], r)
-            # res = [is_collision(r1, r2), is_collision(r1, r3), is_collision(r1, c1), is_collision(r1, c2)]
-            # res = [is_collision_simple(r1, r2), is_collision_simple(r1, r3)]
-            res = [is_collision(r1, r2), is_collision(r1, r3)]
-            # assert res == [True, False, True, False]
-            # assert res == [True, False]
-            # plotobj(r1, r2, r3, c1, c2)
 
+    # rect and rect detection
+    # 平移检测不出什么东西
+    for i_ego in range(len(angles)):
+        angle_ego = angles[i_ego]
+        if i_ego<len(angles)-1:
+            i_other = i_ego+1 
+        else:
+            i_other = 0
+        angle_other = angles[i_other]    
+        for k in range(np.size(centers, 0)):
+            center = centers[k]
+            r1 = Rectangle(0, 0, angle_ego, 4, 3)
+            if dis_r2r[0, i_ego,  k+1] == 0:
+                print('continue')
+            d1 = dis_r2r[0, i_ego,  k]
+            r2 = Rectangle(center[0]*d1, center[1] * d1, angle_other, 4, 3)
+            d2 = dis_r2r[1, i_ego,  k]
+            r3 = Rectangle(center[0] * d2, center[1] * d2, angle_other, 4, 3)
+            res = [is_collision(r1, r2), is_collision(r1, r3)]
+            plotobj(r1, r2, r3)
+            print("res: ", res)
+            # assert res == [True, False]
+
+    # rect and circle collision detection
+    # for i_ego in range(3):
+    #     angle_ego = angles[i_ego]
+    #     for j in range(3):
+    #         center = centers[j]
+    #         d = dis_r2r[i_ego, j]
+    #         r = rs[i_ego,j]
+    #         r1 = Rectangle(center[0], center[1], angle_ego)
+    #         r2 = Rectangle(center[0]+d, center[1], angle_ego*2)
+    #         r3 = Rectangle(center[0]+d+0.1, center[1], angle_ego*2)
+    #         # c1 = Circle(center[0]+d, center[1], r+0.1)
+    #         # c2 = Circle(center[0]+d, center[1], r)
+    #         # res = [is_collision(r1, r2), is_collision(r1, r3), is_collision(r1, c1), is_collision(r1, c2)]
+    #         # res = [is_collision_simple(r1, r2), is_collision_simple(r1, r3)]
+    #         res = [is_collision(r1, r2), is_collision(r1, r3)]
+    #         print("res: ", res)
+    #         # assert res == [True, False, True, False]
+    #         # assert res == [True, False]
+    #         # plotobj(r1, r2, r3, c1, c2)
+    #         plotobj(r1, r2, r3)
 
 
 if __name__=='__main__':
